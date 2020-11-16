@@ -1,7 +1,9 @@
 package com.oumeng.auth.config;
 
 import com.oumeng.auth.entity.AuthConst;
+import com.oumeng.auth.entity.GeneralInsertParam;
 import com.oumeng.auth.entity.User;
+import com.oumeng.auth.entity.UserPermission;
 import com.oumeng.auth.utils.JsonUtil;
 import com.oumeng.auth.utils.ProcessResult;
 import org.slf4j.Logger;
@@ -18,6 +20,8 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * shiro token 拦截器，负责对鉴权等业务进行拦截
@@ -42,6 +46,9 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
 
     @Autowired
     protected StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private GeneralDao generalDao;
 
     @Override
     public void afterPropertiesSet() throws Exception {
@@ -119,6 +126,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                 }
                 //如果角色是admin
                 if (user.getIsAdmin() == 1) {
+                    insertLoginLog(request,requestUrl,user,1);
                     return HandlerInterceptor.super.preHandle(request, response, handler);
                 }
                 String[] notPermissionUrlArr = notPermissionUrl.split(",");
@@ -144,10 +152,12 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                 if(!notPermission){
                     String permission = (String) httpSession.getAttribute(AuthConst.getUrlKey(requestToken, requestUrl));
                     if (!AuthConst.permitCanAccess().equals(permission)) {
+                        insertLoginLog(request,requestUrl,user,2);
                         needAuthAccess(response, ErrorNoPermission, ErrorMsgNoPermission);
                         return false;
                     }
                 }
+                insertLoginLog(request,requestUrl,user,2);
             }
         } catch (Exception e) {
             // TODO Auto-generated catch block
@@ -157,6 +167,38 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
             return false;
         }
         return HandlerInterceptor.super.preHandle(request, response, handler);
+    }
+
+    private void insertLoginLog(HttpServletRequest request,String requestUrl,User user,int success){
+        String permissionStr = (String) request.getSession().getAttribute(AuthConst.getUrlKey(request.getHeader("token"), requestUrl)+"_permission");
+        UserPermission userPermission = JsonUtil.fromJson(permissionStr, UserPermission.class);
+        if(userPermission.getAction()!=null && userPermission.getObject()!=null){
+            Map<String,Object> data = new HashMap<>();
+            data.put("result",success);
+            String ip = ClientUtil.getIpAddr(request);
+            data.put("ip",ip);
+            boolean checkAgentIsMobile = ClientUtil.checkAgentIsMobile(request);
+            if(checkAgentIsMobile){
+                data.put("deviceType",1);
+            }else {
+                data.put("deviceType",2);
+            }
+            String ua = request.getHeader("user-agent");
+            data.put("platform",ua);
+            String imei = request.getHeader("imei");
+            data.put("imei",imei);
+            data.put("loginName",user.getLoginName());
+            String permissionId = userPermission.getPermissionId();
+            if(permissionId.startsWith("001")){
+                data.put("type",1);
+            }else {
+                data.put("type",2);
+            }
+            data.put("url",requestUrl);
+            data.put("action",userPermission.getAction());
+            data.put("object",userPermission.getObject());
+            generalDao.insert("oumengauthdb.tb_log",data);
+        }
     }
 
     /**
