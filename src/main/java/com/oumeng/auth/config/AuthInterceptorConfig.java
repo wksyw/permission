@@ -14,7 +14,7 @@ public class AuthInterceptorConfig extends WebMvcConfigurationSupport  {
 	
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
-	@Resource(name = "authShiroTokenInterceptor")
+	@Autowired
 	private AuthTokenInterceptor tokenInterceptor;
 
     

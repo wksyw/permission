@@ -1,7 +1,6 @@
 package com.oumeng.auth.config;
 
 import com.oumeng.auth.entity.AuthConst;
-import com.oumeng.auth.entity.GeneralInsertParam;
 import com.oumeng.auth.entity.User;
 import com.oumeng.auth.entity.UserPermission;
 import com.oumeng.auth.utils.JsonUtil;
@@ -28,7 +27,7 @@ import java.util.Map;
  *
  * @author helms
  */
-@Service("authShiroTokenInterceptor")
+@Service
 public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBean {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -41,7 +40,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     @Value("${not.interceptor.url:/*}")
     private String notInterceptorUrl;
 
-    @Value("${not.permission.url:/*}")
+    @Value("${not.permission.url:}")
     private String notPermissionUrl;
 
     @Autowired
@@ -126,38 +125,40 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                 }
                 //如果角色是admin
                 if (user.getIsAdmin() == 1) {
-                    insertLoginLog(request,requestUrl,user,1);
+                    insertLog(request,requestUrl,user,1);
                     return HandlerInterceptor.super.preHandle(request, response, handler);
                 }
-                String[] notPermissionUrlArr = notPermissionUrl.split(",");
                 boolean notPermission = false;
-                for (String url : notPermissionUrlArr) {
-                    if ("/*".equals(url)) {
-                        notPermission = true;
-                        break;
-                    }
-                    String notPermissionLeftUrl = url.substring(0, url.indexOf("/", 1));
-                    String notPermissionRightUrl = url.substring(url.indexOf("/", 1));
-                    if (leftUrl.equals(notPermissionLeftUrl)) {
-                        if("/*".equals(notPermissionRightUrl)){
+                if(notPermissionUrl!=null && !notPermissionUrl.equals("")){
+                    String[] notPermissionUrlArr = notPermissionUrl.split(",");
+                    for (String url : notPermissionUrlArr) {
+                        if ("/*".equals(url)) {
                             notPermission = true;
                             break;
                         }
-                        if(rightUrl.equals(notPermissionRightUrl)){
-                            notPermission = true;
-                            break;
+                        String notPermissionLeftUrl = url.substring(0, url.indexOf("/", 1));
+                        String notPermissionRightUrl = url.substring(url.indexOf("/", 1));
+                        if (leftUrl.equals(notPermissionLeftUrl)) {
+                            if("/*".equals(notPermissionRightUrl)){
+                                notPermission = true;
+                                break;
+                            }
+                            if(rightUrl.equals(notPermissionRightUrl)){
+                                notPermission = true;
+                                break;
+                            }
                         }
                     }
                 }
                 if(!notPermission){
                     String permission = (String) httpSession.getAttribute(AuthConst.getUrlKey(requestToken, requestUrl));
-                    if (!AuthConst.permitCanAccess().equals(permission)) {
-                        insertLoginLog(request,requestUrl,user,2);
+                    if ("255".equals(permission)) {
+                        insertLog(request,requestUrl,user,2);
                         needAuthAccess(response, ErrorNoPermission, ErrorMsgNoPermission);
                         return false;
                     }
                 }
-                insertLoginLog(request,requestUrl,user,2);
+                insertLog(request,requestUrl,user,2);
             }
         } catch (Exception e) {
             // TODO Auto-generated catch block
@@ -169,35 +170,44 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
         return HandlerInterceptor.super.preHandle(request, response, handler);
     }
 
-    private void insertLoginLog(HttpServletRequest request,String requestUrl,User user,int success){
-        String permissionStr = (String) request.getSession().getAttribute(AuthConst.getUrlKey(request.getHeader("token"), requestUrl)+"_permission");
-        UserPermission userPermission = JsonUtil.fromJson(permissionStr, UserPermission.class);
-        if(userPermission.getAction()!=null && userPermission.getObject()!=null){
-            Map<String,Object> data = new HashMap<>();
-            data.put("result",success);
-            String ip = ClientUtil.getIpAddr(request);
-            data.put("ip",ip);
-            boolean checkAgentIsMobile = ClientUtil.checkAgentIsMobile(request);
-            if(checkAgentIsMobile){
-                data.put("deviceType",1);
-            }else {
-                data.put("deviceType",2);
+    private void insertLog(HttpServletRequest request, String requestUrl, User user, int success){
+        try {
+            String permissionStr = (String) request.getSession().getAttribute(AuthConst.getUrlKey(request.getHeader("token"), requestUrl)+"_permission");
+            if(permissionStr!=null){
+                UserPermission userPermission = JsonUtil.fromJson(permissionStr, UserPermission.class);
+                if(userPermission.getAction()!=null && userPermission.getObject()!=null){
+                    Map<String,Object> data = new HashMap<>();
+                    data.put("result",success);
+                    String ip = ClientUtil.getIpAddr(request);
+                    data.put("ip",ip);
+                    boolean checkAgentIsMobile = ClientUtil.checkAgentIsMobile(request);
+                    if(checkAgentIsMobile){
+                        data.put("deviceType",1);
+                    }else {
+                        data.put("deviceType",2);
+                    }
+                    String ua = request.getHeader("user-agent");
+                    data.put("platform",ua);
+                    String name = user.getDisplayName();
+                    data.put("name",name);
+                    String imei = request.getHeader("imei");
+                    data.put("imei",imei);
+                    data.put("loginName",user.getLoginName());
+                    String permissionId = userPermission.getPermissionId();
+                    if(permissionId.startsWith("001")){
+                        data.put("type",2);
+                    }else {
+                        data.put("type",3);
+                    }
+                    data.put("url",requestUrl);
+                    data.put("action",userPermission.getAction());
+                    data.put("object",userPermission.getObject());
+                    generalDao.insert("oumengauthdb.tb_log",data);
+                }
             }
-            String ua = request.getHeader("user-agent");
-            data.put("platform",ua);
-            String imei = request.getHeader("imei");
-            data.put("imei",imei);
-            data.put("loginName",user.getLoginName());
-            String permissionId = userPermission.getPermissionId();
-            if(permissionId.startsWith("001")){
-                data.put("type",1);
-            }else {
-                data.put("type",2);
-            }
-            data.put("url",requestUrl);
-            data.put("action",userPermission.getAction());
-            data.put("object",userPermission.getObject());
-            generalDao.insert("oumengauthdb.tb_log",data);
+        }catch (Exception e){
+            e.printStackTrace();
+            logger.error("", e);
         }
     }
 
