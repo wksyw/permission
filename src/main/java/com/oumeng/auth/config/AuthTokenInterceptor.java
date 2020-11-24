@@ -17,8 +17,10 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -202,6 +204,19 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                     data.put("url",requestUrl);
                     data.put("action",userPermission.getAction());
                     data.put("object",userPermission.getObject());
+                    /*StringBuilder sb = new StringBuilder();
+                    String url = request.getRequestURI();
+                    sb.append(url);
+                    sb.append(" ");
+                    Enumeration<String> parameterNames =  request.getParameterNames();
+                    while (parameterNames.hasMoreElements()){
+                        String parameterName = parameterNames.nextElement();
+                        String value = request.getParameter(parameterName);
+                        sb.append(parameterName);
+                        sb.append(":");
+                        sb.append(value);
+                        sb.append(" ");
+                    }*/
                     generalDao.insert("oumengauthdb.tb_log",data);
                 }
             }
