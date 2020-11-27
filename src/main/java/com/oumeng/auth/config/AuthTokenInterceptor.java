@@ -2,7 +2,6 @@ package com.oumeng.auth.config;
 
 import com.oumeng.auth.entity.AuthConst;
 import com.oumeng.auth.entity.User;
-import com.oumeng.auth.entity.UserPermission;
 import com.oumeng.auth.utils.JsonUtil;
 import com.oumeng.auth.utils.ProcessResult;
 import org.slf4j.Logger;
@@ -17,12 +16,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * shiro token 拦截器，负责对鉴权等业务进行拦截
@@ -49,7 +44,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     protected StringRedisTemplate stringRedisTemplate;
 
     @Autowired
-    private GeneralDao generalDao;
+    private DataLogUtil dataLogUtil;
 
     @Override
     public void afterPropertiesSet() throws Exception {
@@ -76,7 +71,6 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
         }
         return false;
     }
-
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
@@ -125,11 +119,6 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
                 }
-                //如果角色是admin
-                if (user.getIsAdmin() == 1) {
-                    insertLog(request,requestUrl,user,1);
-                    return HandlerInterceptor.super.preHandle(request, response, handler);
-                }
                 boolean notPermission = false;
                 if(notPermissionUrl!=null && !notPermissionUrl.equals("")){
                     String[] notPermissionUrlArr = notPermissionUrl.split(",");
@@ -152,15 +141,24 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                         }
                     }
                 }
+                //如果角色是admin
+                if (user.getIsAdmin() == 1) {
+                    if(!notPermission){
+                        dataLogUtil.insertLog(request,requestUrl,user,1);
+                    }
+                    return HandlerInterceptor.super.preHandle(request, response, handler);
+                }
                 if(!notPermission){
                     String permission = (String) httpSession.getAttribute(AuthConst.getUrlKey(requestToken, requestUrl));
                     if ("255".equals(permission)) {
-                        insertLog(request,requestUrl,user,2);
+                        dataLogUtil.insertLog(request,requestUrl,user,2);
                         needAuthAccess(response, ErrorNoPermission, ErrorMsgNoPermission);
                         return false;
                     }
+                    if ("1".equals(permission)) {
+                        dataLogUtil.insertLog(request,requestUrl,user,1);
+                    }
                 }
-                insertLog(request,requestUrl,user,2);
             }
         } catch (Exception e) {
             // TODO Auto-generated catch block
@@ -172,59 +170,6 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
         return HandlerInterceptor.super.preHandle(request, response, handler);
     }
 
-    private void insertLog(HttpServletRequest request, String requestUrl, User user, int success){
-        try {
-            String permissionStr = (String) request.getSession().getAttribute(AuthConst.getUrlKey(request.getHeader("token"), requestUrl)+"_permission");
-            if(permissionStr!=null){
-                UserPermission userPermission = JsonUtil.fromJson(permissionStr, UserPermission.class);
-                if(userPermission.getAction()!=null && userPermission.getObject()!=null){
-                    Map<String,Object> data = new HashMap<>();
-                    data.put("result",success);
-                    String ip = ClientUtil.getIpAddr(request);
-                    data.put("ip",ip);
-                    boolean checkAgentIsMobile = ClientUtil.checkAgentIsMobile(request);
-                    if(checkAgentIsMobile){
-                        data.put("deviceType",1);
-                    }else {
-                        data.put("deviceType",2);
-                    }
-                    String ua = request.getHeader("user-agent");
-                    data.put("platform",ua);
-                    String name = user.getDisplayName();
-                    data.put("name",name);
-                    String imei = request.getHeader("imei");
-                    data.put("imei",imei);
-                    data.put("loginName",user.getLoginName());
-                    String permissionId = userPermission.getPermissionId();
-                    if(permissionId.startsWith("001")){
-                        data.put("type",2);
-                    }else {
-                        data.put("type",3);
-                    }
-                    data.put("url",requestUrl);
-                    data.put("action",userPermission.getAction());
-                    data.put("object",userPermission.getObject());
-                    /*StringBuilder sb = new StringBuilder();
-                    String url = request.getRequestURI();
-                    sb.append(url);
-                    sb.append(" ");
-                    Enumeration<String> parameterNames =  request.getParameterNames();
-                    while (parameterNames.hasMoreElements()){
-                        String parameterName = parameterNames.nextElement();
-                        String value = request.getParameter(parameterName);
-                        sb.append(parameterName);
-                        sb.append(":");
-                        sb.append(value);
-                        sb.append(" ");
-                    }*/
-                    generalDao.insert("oumengauthdb.tb_log",data);
-                }
-            }
-        }catch (Exception e){
-            e.printStackTrace();
-            logger.error("", e);
-        }
-    }
 
     /**
      * @param response
