@@ -34,6 +34,9 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     private final int ErrorNoPermission = 2008;
     private final String ErrorMsgNoPermission = "没有权限操作";
 
+    public static final int ERROR_USER_STATUS_LOCK = 20002;
+    public static final String ERROR_USER_STATUS_LOCK_MSG = "用户已被停用";
+
     @Value("${not.interceptor.url:/*}")
     private String notInterceptorUrl;
 
@@ -114,9 +117,8 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
                 }
-                String flag = stringRedisTemplate.opsForValue().get(AuthConst.getUserIdExpiredKey(user.getUserId() + ""));
-                if ("true".equals(flag)) {
-                    needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
+                if (user.getStatus()==1) {
+                    needAuthAccess(response, ERROR_USER_STATUS_LOCK, ERROR_USER_STATUS_LOCK_MSG);
                     return false;
                 }
                 boolean notPermission = false;
@@ -149,7 +151,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                     return HandlerInterceptor.super.preHandle(request, response, handler);
                 }
                 if(!notPermission){
-                    String permission = (String) httpSession.getAttribute(AuthConst.getUrlKey(requestToken, requestUrl));
+                    String permission = stringRedisTemplate.opsForValue().get((AuthConst.getUrlKey(user.getUserId()+"", requestUrl)));
                     if ("255".equals(permission)) {
                         dataLogUtil.insertLog(request,requestUrl,user,2);
                         needAuthAccess(response, ErrorNoPermission, ErrorMsgNoPermission);
