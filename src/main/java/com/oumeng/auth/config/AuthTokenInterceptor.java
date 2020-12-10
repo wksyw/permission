@@ -40,7 +40,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     @Value("${not.interceptor.url:/*}")
     private String notInterceptorUrl;
 
-    @Value("${not.permission.url:}")
+    @Value("${not.permission.url:/*}")
     private String notPermissionUrl;
 
     @Autowired
@@ -48,6 +48,9 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
 
     @Autowired
     private DataLogUtil dataLogUtil;
+
+    @Autowired
+    private Request request;
 
     @Override
     public void afterPropertiesSet() throws Exception {
@@ -76,12 +79,12 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     }
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+    public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse response, Object handler)
             throws Exception {
         // TODO Auto-generated method stub
         try {
-            String requestUrl = request.getRequestURI();
-            requestUrl = requestUrl.replace(request.getContextPath(), "");
+            String requestUrl = httpServletRequest.getRequestURI();
+            requestUrl = requestUrl.replace(httpServletRequest.getContextPath(), "");
             String leftUrl = requestUrl.substring(0, requestUrl.indexOf("/", 1));
             String rightUrl = requestUrl.substring(requestUrl.indexOf("/", 1));
             String[] notInterceptorUrlArr = notInterceptorUrl.split(",");
@@ -105,14 +108,12 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                 }
             }
             if (!notInterceptor) {
-                HttpSession httpSession = request.getSession();
-                String requestToken = request.getHeader("token");
+                String requestToken = httpServletRequest.getHeader("token");
                 if (requestToken == null) {
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
                 }
-                String userStr = (String) request.getSession().getAttribute(AuthConst.getUserInfoKey(requestToken));
-                User user = JsonUtil.fromJson(userStr, User.class);
+                User user = request.getLoginUser();
                 if (user == null) {
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
@@ -146,19 +147,19 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                 //如果角色是admin
                 if (user.getIsAdmin() == 1) {
                     if(!notPermission){
-                        dataLogUtil.insertLog(request,requestUrl,user,1);
+                        dataLogUtil.insertLog(httpServletRequest,requestUrl,user,1);
                     }
-                    return HandlerInterceptor.super.preHandle(request, response, handler);
+                    return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
                 }
                 if(!notPermission){
                     String permission = stringRedisTemplate.opsForValue().get((AuthConst.getUrlKey(user.getUserId()+"", requestUrl)));
                     if ("255".equals(permission)) {
-                        dataLogUtil.insertLog(request,requestUrl,user,2);
+                        dataLogUtil.insertLog(httpServletRequest,requestUrl,user,2);
                         needAuthAccess(response, ErrorNoPermission, ErrorMsgNoPermission);
                         return false;
                     }
                     if ("1".equals(permission)) {
-                        dataLogUtil.insertLog(request,requestUrl,user,1);
+                        dataLogUtil.insertLog(httpServletRequest,requestUrl,user,1);
                     }
                 }
             }
@@ -169,7 +170,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
             needAuthAccess(response, -1, "exception error");
             return false;
         }
-        return HandlerInterceptor.super.preHandle(request, response, handler);
+        return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
     }
 
 

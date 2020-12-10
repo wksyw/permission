@@ -4,6 +4,7 @@ import com.oumeng.auth.entity.AuthConst;
 import com.oumeng.auth.entity.User;
 import com.oumeng.auth.utils.JsonUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
@@ -15,9 +16,12 @@ public class Request {
     @Autowired
     private HttpServletRequest request;
 
+    @Autowired
+    protected StringRedisTemplate stringRedisTemplate;
+
     public User getLoginUser() {
         String requestToken = request.getHeader("token");
-        String userStr = (String) request.getSession().getAttribute(AuthConst.getUserInfoKey(requestToken));
+        String userStr = stringRedisTemplate.opsForValue().get(AuthConst.getUserInfoKey(requestToken));
         User user = JsonUtil.fromJson(userStr, User.class);
         return user;
     }
