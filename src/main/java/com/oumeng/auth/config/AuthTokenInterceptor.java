@@ -46,8 +46,8 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     @Autowired
     protected StringRedisTemplate stringRedisTemplate;
 
-    @Autowired
-    private DataLogUtil dataLogUtil;
+    /*@Autowired
+    private DataLogUtil dataLogUtil;*/
 
     @Autowired
     private Request request;
@@ -146,20 +146,20 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                 }
                 //如果角色是admin
                 if (user.getIsAdmin() == 1) {
-                    if(!notPermission){
+                    /*if(!notPermission){
                         dataLogUtil.insertLog(httpServletRequest,requestUrl,user,1);
-                    }
+                    }*/
                     return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
                 }
                 if(!notPermission){
                     String permission = stringRedisTemplate.opsForValue().get((AuthConst.getUrlKey(user.getUserId()+"", requestUrl)));
                     if ("255".equals(permission)) {
-                        dataLogUtil.insertLog(httpServletRequest,requestUrl,user,2);
+                        //dataLogUtil.insertLog(httpServletRequest,requestUrl,user,2);
                         needAuthAccess(response, ErrorNoPermission, ErrorMsgNoPermission);
                         return false;
                     }
                     if ("1".equals(permission)) {
-                        dataLogUtil.insertLog(httpServletRequest,requestUrl,user,1);
+                        //dataLogUtil.insertLog(httpServletRequest,requestUrl,user,1);
                     }
                 }
             }

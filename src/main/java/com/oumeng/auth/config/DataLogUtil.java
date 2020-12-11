@@ -1,3 +1,4 @@
+/*
 package com.oumeng.auth.config;
 
 import com.oumeng.auth.entity.AuthConst;
@@ -64,3 +65,4 @@ public class DataLogUtil {
         }
     }
 }
+*/

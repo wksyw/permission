@@ -1,3 +1,4 @@
+/*
 package com.oumeng.auth.config;
 
 import org.apache.ibatis.annotations.Insert;
@@ -18,4 +19,4 @@ public interface GeneralDao {
     })
     @Options(useGeneratedKeys = true, keyProperty = "data.id")
     void insert(String table, Map<String, Object> data);
-}
+}*/
