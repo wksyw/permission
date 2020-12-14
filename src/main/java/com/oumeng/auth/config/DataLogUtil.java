@@ -1,4 +1,3 @@
-/*
 package com.oumeng.auth.config;
 
 import com.oumeng.auth.entity.AuthConst;
@@ -8,6 +7,7 @@ import com.oumeng.auth.utils.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -23,10 +23,13 @@ public class DataLogUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(DataLogUtil.class);
 
+    @Autowired
+    protected StringRedisTemplate stringRedisTemplate;
+
     @Async
     public void insertLog(HttpServletRequest request, String requestUrl, User user, int success){
         try {
-            String permissionStr = (String) request.getSession().getAttribute(AuthConst.getUrlKey(request.getHeader("token"), requestUrl)+"_permission");
+            String permissionStr = stringRedisTemplate.opsForValue().get(AuthConst.getUrlKey(request.getHeader("token"), requestUrl)+"_permission");
             if(permissionStr!=null){
                 UserPermission userPermission = JsonUtil.fromJson(permissionStr, UserPermission.class);
                 if(userPermission.getAction()!=null && userPermission.getObject()!=null){
@@ -65,4 +68,3 @@ public class DataLogUtil {
         }
     }
 }
-*/

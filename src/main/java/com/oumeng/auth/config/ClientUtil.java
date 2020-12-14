@@ -20,13 +20,15 @@ public class ClientUtil {
     public static boolean checkAgentIsMobile(HttpServletRequest request) {
         String ua = request.getHeader("user-agent");
         boolean flag = false;
-        if (!ua.contains("Windows NT") || (ua.contains("Windows NT") && ua.contains("compatible; MSIE 9.0;"))) {
-            // 排除 苹果桌面系统
-            if (!ua.contains("Windows NT") && !ua.contains("Macintosh")) {
-                for (String item : agent) {
-                    if (ua.contains(item)) {
-                        flag = true;
-                        break;
+        if(ua!=null){
+            if (!ua.contains("Windows NT") || (ua.contains("Windows NT") && ua.contains("compatible; MSIE 9.0;"))) {
+                // 排除 苹果桌面系统
+                if (!ua.contains("Windows NT") && !ua.contains("Macintosh")) {
+                    for (String item : agent) {
+                        if (ua.contains(item)) {
+                            flag = true;
+                            break;
+                        }
                     }
                 }
             }
