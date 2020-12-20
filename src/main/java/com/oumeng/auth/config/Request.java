@@ -21,7 +21,7 @@ public class Request {
 
     public User getLoginUser() {
         String requestToken = request.getHeader("token");
-        String userStr = stringRedisTemplate.opsForValue().get(AuthConst.getUserInfoKey(requestToken));
+        String userStr = stringRedisTemplate.opsForValue().get(AuthConst.getUserInfoKey(stringRedisTemplate.opsForValue().get(requestToken)));
         User user = JsonUtil.fromJson(userStr, User.class);
         return user;
     }
