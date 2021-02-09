@@ -15,7 +15,6 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.PrintWriter;
 
@@ -82,11 +81,16 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse response, Object handler)
             throws Exception {
         // TODO Auto-generated method stub
+        String requestUrl ="";
         try {
-            String requestUrl = httpServletRequest.getRequestURI();
+            requestUrl = httpServletRequest.getRequestURI();
             requestUrl = requestUrl.replace(httpServletRequest.getContextPath(), "");
-            String leftUrl = requestUrl.substring(0, requestUrl.indexOf("/", 1));
-            String rightUrl = requestUrl.substring(requestUrl.indexOf("/", 1));
+            int urlIndex = requestUrl.indexOf("/", 1);
+            if(urlIndex==-1){
+                return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
+            }
+            String leftUrl = requestUrl.substring(0, urlIndex);
+            String rightUrl = requestUrl.substring(urlIndex);
             String[] notInterceptorUrlArr = notInterceptorUrl.split(",");
             boolean notInterceptor = false;
             for (String url : notInterceptorUrlArr) {
@@ -107,13 +111,13 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                     }
                 }
             }
+            User user = request.getLoginUser();
             if (!notInterceptor) {
                 String requestToken = httpServletRequest.getHeader("token");
                 if (requestToken == null) {
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
                 }
-                User user = request.getLoginUser();
                 if (user == null) {
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
@@ -162,11 +166,16 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                         dataLogUtil.insertLog(httpServletRequest,requestUrl,user,1);
                     }
                 }
+            }else {
+                if(user!=null && user.getStatus()==1){
+                    needAuthAccess(response, ERROR_USER_STATUS_LOCK, ERROR_USER_STATUS_LOCK_MSG);
+                    return false;
+                }
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-            logger.error("", e);
+            logger.error("requestUri="+requestUrl, e);
             needAuthAccess(response, -1, "exception error");
             return false;
         }

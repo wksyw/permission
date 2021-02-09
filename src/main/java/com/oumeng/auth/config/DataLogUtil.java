@@ -18,7 +18,7 @@ import java.util.Map;
 @Component
 public class DataLogUtil {
 
-    @Autowired
+    @Autowired(required = false)
     private GeneralDao generalDao;
 
     private static final Logger logger = LoggerFactory.getLogger(DataLogUtil.class);
@@ -59,7 +59,7 @@ public class DataLogUtil {
                     data.put("url",requestUrl);
                     data.put("action",userPermission.getAction());
                     data.put("object",userPermission.getObject());
-                    generalDao.insert("oumengauthdb.tb_log",data);
+                    generalDao.insert("tb_log",data);
                 }
             }
         }catch (Exception e){
