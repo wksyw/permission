@@ -3,7 +3,9 @@ package com.oumeng.auth.config;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
 import java.util.Map;
 
 @Mapper
@@ -18,4 +20,7 @@ public interface GeneralDao {
     })
     @Options(useGeneratedKeys = true, keyProperty = "data.id")
     void insert(String table, Map<String, Object> data);
+
+    @Select({"select ${column} from ${table} where ${condition}"})
+    List<Map<String, Object>> query(String column, String table, String condition);
 }
