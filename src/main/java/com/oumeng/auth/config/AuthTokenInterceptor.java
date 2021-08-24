@@ -77,6 +77,9 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
         return false;
     }
 
+    @Autowired
+    private ControllerResponseHandler controllerResponseHandler;
+
     @Override
     public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse response, Object handler)
             throws Exception {
@@ -85,6 +88,9 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
         try {
             requestUrl = httpServletRequest.getRequestURI();
             requestUrl = requestUrl.replace(httpServletRequest.getContextPath(), "");
+            if(requestUrl.equals(ControllerResponseHandler.interceptorUrl)){
+                controllerResponseHandler.sendLog(requestUrl,null);
+            }
             int urlIndex = requestUrl.indexOf("/", 1);
             if(urlIndex==-1){
                 return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
@@ -205,6 +211,11 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
             e.printStackTrace();
             logger.error("", e);
         }
+
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
 
     }
 }

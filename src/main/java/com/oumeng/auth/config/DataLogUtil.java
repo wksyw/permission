@@ -1,15 +1,13 @@
 package com.oumeng.auth.config;
 
-import com.oumeng.auth.entity.AuthConst;
-import com.oumeng.auth.entity.GeneralQueryParam;
 import com.oumeng.auth.entity.User;
 import com.oumeng.auth.entity.UserPermission;
 import com.oumeng.auth.utils.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
@@ -28,14 +26,22 @@ public class DataLogUtil {
     @Autowired
     protected StringRedisTemplate stringRedisTemplate;
 
-    @Async
+    @Value("${databaseName:}")
+    private String databaseName;
+
     public void insertLog(HttpServletRequest request, String requestUrl, User user, int success){
         try {
             //String permissionStr = stringRedisTemplate.opsForValue().get(AuthConst.getUrlKey(request.getHeader("token"), requestUrl)+"_permission");
-            GeneralQueryParam generalQueryParam = new GeneralQueryParam();
-            generalQueryParam.setTableName("tb_permission");
-            generalQueryParam.setCondition("url='"+requestUrl+"'");
-            List<Map<String, Object>> permission =  generalDao.query("*","tb_permission","url='"+requestUrl+"'");
+            String permissionTableName = null;
+            String logTableName = null;
+            if(!databaseName.equals("")){
+                permissionTableName = databaseName+".tb_permission";
+                logTableName = databaseName+".tb_log";
+            }else {
+                permissionTableName = "tb_permission";
+                logTableName = "tb_log";
+            }
+            List<Map<String, Object>> permission =  generalDao.query("*",permissionTableName,"url='"+requestUrl+"'");
             if(permission.size()!=0){
                 String permissionStr = JsonUtil.toJson(permission.get(0));
                 if(permissionStr!=null){
@@ -67,7 +73,7 @@ public class DataLogUtil {
                         data.put("url",requestUrl);
                         data.put("action",userPermission.getAction());
                         data.put("object",userPermission.getObject());
-                        generalDao.insert("tb_log",data);
+                        generalDao.insert(logTableName,data);
                     }
                 }
             }

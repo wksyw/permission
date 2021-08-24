@@ -1,6 +1,7 @@
 package com.oumeng.auth.config;
 
 import com.oumeng.auth.entity.Response;
+import com.oumeng.auth.utils.JsonUtil;
 import com.oumeng.auth.utils.ProcessResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,13 +31,20 @@ public class ControllerResponseHandler implements ResponseBodyAdvice<Object> {
 
 	private static Set<String> paramUrls;
 
+	public static String interceptorUrl = "/useradmin/exportUser";
+
 	static {
 		paramData.put("/user/login",new String[]{"DL","DL","T_001"});
 
 		paramData.put("/useradmin/addUser",new String[]{"YHGL_HTZH","XZ","T_023"});
-		paramData.put("/useradmin/searchUser",new String[]{"YHGL_HTZH","CX","T_002"});
+		//paramData.put("/useradmin/searchUser",new String[]{"YHGL_HTZH","CX","T_002"});
 		paramData.put("/useradmin/exportUser",new String[]{"YHGL_HTZH","DC","T_003"});
 		paramData.put("/useradmin/updateUser",new String[]{"YHGL_HTZH","BJ","T_019"});
+
+		paramData.put("/useradmin/enableBeforeUser",new String[]{"YHGL_QDYH","QY","T_027"});
+		paramData.put("/useradmin/enableAfterUser",new String[]{"YHGL_HTZH","QY","T_027"});
+		paramData.put("/useradmin/disableBeforeUser",new String[]{"YHGL_QDYH","TY","T_028"});
+		paramData.put("/useradmin/disableAfterUser",new String[]{"YHGL_HTZH","TY","T_028"});
 
 		paramData.put("/useradmin/addRole",new String[]{"YHGL_HTJS","XZ","T_021"});
 		paramData.put("/useradmin/deleteRole",new String[]{"YHGL_HTJS","SC","T_020"});
@@ -67,32 +75,9 @@ public class ControllerResponseHandler implements ResponseBodyAdvice<Object> {
 								  Class<? extends HttpMessageConverter<?>> selectedConverterType, ServerHttpRequest request,
 								  ServerHttpResponse response) {
 		try {
-			String url = request.getURI().getPath();
-			if(logRequestUrl!=null && !logRequestUrl.equals("") && paramUrls.contains(url)){
-				if (body instanceof ProcessResult) {
-					ProcessResult processResult = (ProcessResult) body;
-					if (processResult.getResult() == 0) {
-						String operationModule = paramData.get(url)[0];
-						String operationType = paramData.get(url)[1];
-						String descType = paramData.get(url)[2];
-						String logParam = processResult.getSign();
-						HttpHeaders headers = new HttpHeaders();
-						headers.add("Content-Type","application/json");
-						headers.add("token",httpServletRequest.getHeader("token"));
-						headers.add("version","V1.0.1");
-						Map<String, Object> hashMap = new HashMap<String, Object>();
-						hashMap.put("operationModule",operationModule);
-						hashMap.put("operationType",operationType);
-						hashMap.put("descType",descType);
-						if(logParam!=null){
-							hashMap.put("logParam",logParam);
-						}
-						HttpEntity requestEntity =new HttpEntity(hashMap,headers);
-						Response sendLogResponse = restTemplate.postForObject(logRequestUrl,requestEntity, Response.class);
-						logger.info("sendLog response:" + sendLogResponse.getMsg());
-					}
-				}
-			}
+			String url = httpServletRequest.getRequestURI();
+			url = url.replace(httpServletRequest.getContextPath(), "");
+			sendLog(url,body);
 		}catch (Exception e){
 			e.printStackTrace();
 			logger.error("", e);
@@ -100,4 +85,45 @@ public class ControllerResponseHandler implements ResponseBodyAdvice<Object> {
 		return body;
 	}
 
+	public void sendLog(String url,Object body){
+		try {
+			if(logRequestUrl!=null && !logRequestUrl.equals("") && paramUrls.contains(url)){
+				String token = httpServletRequest.getHeader("token");
+				Map<String, Object> hashMap = new HashMap<String, Object>();
+				if (body instanceof ProcessResult) {
+					ProcessResult processResult = (ProcessResult) body;
+					if (processResult.getResult() == 0) {
+						if(token==null){
+							Object responseInfo = processResult.getResponseInfo();
+							if(responseInfo!=null){
+								token = (String) ((Map)JsonUtil.fromJson(JsonUtil.toJson(responseInfo),Map.class)).get("token");
+								String logParam = processResult.getSign();
+								if(logParam!=null){
+									hashMap.put("logParam",logParam);
+								}
+							}
+						}
+					}
+				}
+				String operationModule = paramData.get(url)[0];
+				String operationType = paramData.get(url)[1];
+				String descType = paramData.get(url)[2];
+				HttpHeaders headers = new HttpHeaders();
+				headers.add("Content-Type","application/json");
+				headers.add("token",token);
+				headers.add("version","V1.0.1");
+				hashMap.put("operationModule",operationModule);
+				hashMap.put("operationType",operationType);
+				hashMap.put("descType",descType);
+				logger.info("sendLog url:" + url);
+				logger.info("sendLog data:" + JsonUtil.toJson(hashMap));
+				HttpEntity requestEntity =new HttpEntity(hashMap,headers);
+				Response sendLogResponse = restTemplate.postForObject(logRequestUrl,requestEntity, Response.class);
+				logger.info("sendLog response:" + sendLogResponse.getMsg());
+			}
+		}catch (Exception e){
+			e.printStackTrace();
+			logger.error("", e);
+		}
+	}
 }
