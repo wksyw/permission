@@ -36,10 +36,10 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     public static final int ERROR_USER_STATUS_LOCK = 20002;
     public static final String ERROR_USER_STATUS_LOCK_MSG = "用户已被停用";
 
-    @Value("${not.interceptor.url:/*}")
+    @Value("${not.interceptor.url:}")
     private String notInterceptorUrl;
 
-    @Value("${not.permission.url:/*}")
+    @Value("${not.permission.url:}")
     private String notPermissionUrl;
 
     @Autowired
@@ -81,8 +81,10 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse response, Object handler)
             throws Exception {
         // TODO Auto-generated method stub
+        logger.info("AuthTokenInterceptor");
         String requestUrl ="";
         try {
+            boolean notInterceptor = false;
             requestUrl = httpServletRequest.getRequestURI();
             requestUrl = requestUrl.replace(httpServletRequest.getContextPath(), "");
             int urlIndex = requestUrl.indexOf("/", 1);
@@ -91,23 +93,24 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
             }
             String leftUrl = requestUrl.substring(0, urlIndex);
             String rightUrl = requestUrl.substring(urlIndex);
-            String[] notInterceptorUrlArr = notInterceptorUrl.split(",");
-            boolean notInterceptor = false;
-            for (String url : notInterceptorUrlArr) {
-                if ("/*".equals(url)) {
-                    notInterceptor = true;
-                    break;
-                }
-                String notInterceptorLeftUrl = url.substring(0, url.indexOf("/", 1));
-                String notInterceptorRightUrl = url.substring(url.indexOf("/", 1));
-                if (leftUrl.equals(notInterceptorLeftUrl)) {
-                    if("/*".equals(notInterceptorRightUrl)){
+            if(!notInterceptorUrl.equals("")){
+                String[] notInterceptorUrlArr = notInterceptorUrl.split(",");
+                for (String url : notInterceptorUrlArr) {
+                    if ("/*".equals(url)) {
                         notInterceptor = true;
                         break;
                     }
-                    if(rightUrl.equals(notInterceptorRightUrl)){
-                        notInterceptor = true;
-                        break;
+                    String notInterceptorLeftUrl = url.substring(0, url.indexOf("/", 1));
+                    String notInterceptorRightUrl = url.substring(url.indexOf("/", 1));
+                    if (leftUrl.equals(notInterceptorLeftUrl)) {
+                        if("/*".equals(notInterceptorRightUrl)){
+                            notInterceptor = true;
+                            break;
+                        }
+                        if(rightUrl.equals(notInterceptorRightUrl)){
+                            notInterceptor = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -161,8 +164,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                         dataLogUtil.insertLog(httpServletRequest,requestUrl,user,2);
                         needAuthAccess(response, ErrorNoPermission, ErrorMsgNoPermission);
                         return false;
-                    }
-                    if ("1".equals(permission)) {
+                    }else{
                         dataLogUtil.insertLog(httpServletRequest,requestUrl,user,1);
                     }
                 }
