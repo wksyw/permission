@@ -42,6 +42,9 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     @Value("${not.permission.url:}")
     private String notPermissionUrl;
 
+    @Value("${not.interceptor.token:}")
+    private String notInterceptorToken;
+
     @Autowired
     protected StringRedisTemplate stringRedisTemplate;
 
@@ -81,13 +84,17 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse response, Object handler)
             throws Exception {
         // TODO Auto-generated method stub
-        logger.info("AuthTokenInterceptor");
         String requestUrl ="";
         try {
             boolean notInterceptor = false;
             requestUrl = httpServletRequest.getRequestURI();
+            logger.info("AuthTokenInterceptor: "+requestUrl);
             requestUrl = requestUrl.replace(httpServletRequest.getContextPath(), "");
             int urlIndex = requestUrl.indexOf("/", 1);
+            String requestToken = httpServletRequest.getHeader("token");
+            if(!notInterceptorToken.equals("") && notInterceptorToken.equals(requestToken)){
+                return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
+            }
             if(urlIndex==-1){
                 return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
             }
@@ -116,7 +123,6 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
             }
             User user = request.getLoginUser();
             if (!notInterceptor) {
-                String requestToken = httpServletRequest.getHeader("token");
                 if (requestToken == null) {
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
