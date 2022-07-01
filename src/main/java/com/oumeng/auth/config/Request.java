@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -32,6 +33,7 @@ public class Request {
 
     @Autowired
     protected StringRedisTemplate stringRedisTemplate;
+
 
     public User getLoginUser(String token) {
         if(token==null){
@@ -66,6 +68,7 @@ public class Request {
         User user = new User();
         user.setUserId(userId);
         HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
         headers.add("token", request.getHeader("token"));
         HttpEntity<User> formEntity = new HttpEntity<>(user, headers);
         ProcessResult getUserResult = restTemplate.postForObject(authUrl+"/userInfo/getUserByUserId", formEntity, ProcessResult.class);
