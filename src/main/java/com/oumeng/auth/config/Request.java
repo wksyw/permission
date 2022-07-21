@@ -46,7 +46,16 @@ public class Request {
                 return null;
             }
             userStr = stringRedisTemplate.opsForValue().get(AuthConst.getUserInfoKey(userInfoKey));
-            stringRedisTemplate.opsForValue().set(token, userInfoKey, Long.parseLong(stringRedisTemplate.opsForValue().get("tokenTimeOutTime")), TimeUnit.SECONDS);
+            String tokenTimeOutTime;
+            if(token.contains("_")){
+                String[] tokenArr = token.split("_");
+                tokenTimeOutTime = stringRedisTemplate.opsForValue().get("tokenTimeOutTime:"+tokenArr[tokenArr.length-1]);
+            }else {
+                tokenTimeOutTime = stringRedisTemplate.opsForValue().get("tokenTimeOutTime");
+            }
+            if(tokenTimeOutTime!=null && !tokenTimeOutTime.equals("")){
+                stringRedisTemplate.opsForValue().set(token, userInfoKey, Long.parseLong(tokenTimeOutTime), TimeUnit.SECONDS);
+            }
         }else {
             userStr = stringRedisTemplate.opsForValue().get(AuthConst.getUserInfoKey(token));
         }
@@ -100,4 +109,5 @@ public class Request {
     public boolean isLeader(int leader,int userId) {
         return (leader+"").equals(getUser(userId).getLeader());
     }
+
 }
