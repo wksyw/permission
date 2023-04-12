@@ -40,22 +40,14 @@ public class Request {
             return null;
         }
         String userStr;
-        if(token.contains("-")){
+        String tokenTimeOutTime = stringRedisTemplate.opsForValue().get("tokenTimeOutTime");
+        if(tokenTimeOutTime!=null && !tokenTimeOutTime.equals("")){
             String userInfoKey = stringRedisTemplate.opsForValue().get(token);
             if(userInfoKey==null){
                 return null;
             }
             userStr = stringRedisTemplate.opsForValue().get(AuthConst.getUserInfoKey(userInfoKey));
-            String tokenTimeOutTime;
-            if(token.contains("_")){
-                String[] tokenArr = token.split("_");
-                tokenTimeOutTime = stringRedisTemplate.opsForValue().get("tokenTimeOutTime:"+tokenArr[tokenArr.length-1]);
-            }else {
-                tokenTimeOutTime = stringRedisTemplate.opsForValue().get("tokenTimeOutTime");
-            }
-            if(tokenTimeOutTime!=null && !tokenTimeOutTime.equals("")){
-                stringRedisTemplate.opsForValue().set(token, userInfoKey, Long.parseLong(tokenTimeOutTime), TimeUnit.SECONDS);
-            }
+            stringRedisTemplate.opsForValue().set(token, userInfoKey, Long.parseLong(tokenTimeOutTime), TimeUnit.SECONDS);
         }else {
             userStr = stringRedisTemplate.opsForValue().get(AuthConst.getUserInfoKey(token));
         }

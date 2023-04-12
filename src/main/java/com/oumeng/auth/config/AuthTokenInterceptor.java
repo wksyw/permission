@@ -17,6 +17,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Map;
 
 /**
  * shiro token 拦截器，负责对鉴权等业务进行拦截
@@ -30,20 +31,26 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     private final int ErrorNeedToken = 3008;
     private final String ErrorMsgNeedToken = "用户没有登录";
 
+    private final int ErrorVersionCheck = 2009;
+    private final String ErrorMsgVersionCheck = "版本不一致";
+
     private final int ErrorNoPermission = 2008;
     private final String ErrorMsgNoPermission = "没有权限操作";
 
     public static final int ERROR_USER_STATUS_LOCK = 20002;
     public static final String ERROR_USER_STATUS_LOCK_MSG = "用户已被停用";
 
-    @Value("${not.interceptor.url:}")
-    private String notInterceptorUrl;
+    /*@Value("${not.interceptor.url:}")
+    private String notInterceptorUrl;*/
 
-    @Value("${not.permission.url:}")
+    @Value("${not.permission.url:/*}")
     private String notPermissionUrl;
 
     @Value("${not.interceptor.token:}")
     private String notInterceptorToken;
+
+    @Value("${spring.application.name:defaultService}")
+    private String applicationName;
 
     @Autowired
     protected StringRedisTemplate stringRedisTemplate;
@@ -86,9 +93,29 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
         // TODO Auto-generated method stub
         String requestUrl ="";
         try {
+            String version = httpServletRequest.getHeader("version");
+            Map<String, Object> data = JsonUtil.fromJson(stringRedisTemplate.opsForValue().get("versionData"), Map.class);
+            if(version!=null){
+                if(data!=null){
+                    String configVersion = (String) data.get("version");
+                    if(configVersion!=null && !configVersion.equals("")){
+                        Object versionCheckObject = data.get("versionCheck");
+                        if(versionCheckObject!=null){
+                            String versionCheckStr = versionCheckObject.toString();
+                            if(versionCheckStr.equals("1")){
+                                if(versionChanged(version,configVersion)){
+                                    logger.info("AuthTokenInterceptor version: "+version+" configVersion:"+configVersion);
+                                    needAuthAccess(response, ErrorVersionCheck, ErrorMsgVersionCheck);
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             boolean notInterceptor = false;
             requestUrl = httpServletRequest.getRequestURI();
-            logger.info("AuthTokenInterceptor: "+requestUrl);
+            logger.info("AuthTokenInterceptor: "+requestUrl+" applicationName: "+applicationName);
             requestUrl = requestUrl.replace(httpServletRequest.getContextPath(), "");
             int urlIndex = requestUrl.indexOf("/", 1);
             String requestToken = httpServletRequest.getHeader("token");
@@ -98,40 +125,50 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
             if(urlIndex==-1){
                 return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
             }
-            String leftUrl = requestUrl.substring(0, urlIndex);
-            String rightUrl = requestUrl.substring(urlIndex);
-            if(!notInterceptorUrl.equals("")){
-                String[] notInterceptorUrlArr = notInterceptorUrl.split(",");
-                for (String url : notInterceptorUrlArr) {
-                    if ("/*".equals(url)) {
+            /*String leftUrl = requestUrl.substring(0, urlIndex);
+            String rightUrl = requestUrl.substring(urlIndex);*/
+            String notInterceptorUrl = stringRedisTemplate.opsForValue().get("notInterceptorUrl:" + applicationName);
+            if(notInterceptorUrl==null || notInterceptorUrl.equals("")){
+                notInterceptorUrl = "/*";
+            }
+            String[] notInterceptorUrlArr = notInterceptorUrl.split(",");
+            for (String url : notInterceptorUrlArr) {
+                if ("/*".equals(url)) {
+                    notInterceptor = true;
+                    break;
+                }
+                String notInterceptorLeftUrl = url.replace("*","");
+                /*String notInterceptorLeftUrl = url.substring(0, url.indexOf("/", 1));
+                String notInterceptorRightUrl = url.substring(url.indexOf("/", 1));
+                if (leftUrl.equals(notInterceptorLeftUrl)) {
+                    if("/*".equals(notInterceptorRightUrl)){
                         notInterceptor = true;
                         break;
                     }
-                    String notInterceptorLeftUrl = url.substring(0, url.indexOf("/", 1));
-                    String notInterceptorRightUrl = url.substring(url.indexOf("/", 1));
-                    if (leftUrl.equals(notInterceptorLeftUrl)) {
-                        if("/*".equals(notInterceptorRightUrl)){
-                            notInterceptor = true;
-                            break;
-                        }
-                        if(rightUrl.equals(notInterceptorRightUrl)){
-                            notInterceptor = true;
-                            break;
-                        }
+                    if(rightUrl.equals(notInterceptorRightUrl)){
+                        notInterceptor = true;
+                        break;
                     }
+                }*/
+                if(requestUrl.startsWith(notInterceptorLeftUrl)){
+                    notInterceptor = true;
+                    break;
                 }
             }
             User user = request.getLoginUser();
             if (!notInterceptor) {
                 if (requestToken == null) {
+                    logger.info("AuthTokenInterceptor token: "+requestToken);
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
                 }
                 if (user == null) {
+                    logger.info("AuthTokenInterceptor token: "+requestToken);
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
                 }
                 if (user.getStatus()==1) {
+                    logger.info("AuthTokenInterceptor token: "+requestToken);
                     needAuthAccess(response, ERROR_USER_STATUS_LOCK, ERROR_USER_STATUS_LOCK_MSG);
                     return false;
                 }
@@ -143,7 +180,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                             notPermission = true;
                             break;
                         }
-                        String notPermissionLeftUrl = url.substring(0, url.indexOf("/", 1));
+                        /*String notPermissionLeftUrl = url.substring(0, url.indexOf("/", 1));
                         String notPermissionRightUrl = url.substring(url.indexOf("/", 1));
                         if (leftUrl.equals(notPermissionLeftUrl)) {
                             if("/*".equals(notPermissionRightUrl)){
@@ -154,6 +191,11 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                                 notPermission = true;
                                 break;
                             }
+                        }*/
+                        String notInterceptorLeftUrl = url.replace("*","");
+                        if(requestUrl.startsWith(notInterceptorLeftUrl)){
+                            notPermission = true;
+                            break;
                         }
                     }
                 }
@@ -167,6 +209,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                 if(!notPermission){
                     String permission = stringRedisTemplate.opsForValue().get((AuthConst.getUrlKey(user.getUserId()+"", requestUrl)));
                     if ("255".equals(permission)) {
+                        logger.info("AuthTokenInterceptor token: "+requestToken);
                         dataLogUtil.insertLog(httpServletRequest,requestUrl,user,2);
                         needAuthAccess(response, ErrorNoPermission, ErrorMsgNoPermission);
                         return false;
@@ -176,6 +219,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                 }
             }else {
                 if(user!=null && user.getStatus()==1){
+                    logger.info("AuthTokenInterceptor token: "+requestToken);
                     needAuthAccess(response, ERROR_USER_STATUS_LOCK, ERROR_USER_STATUS_LOCK_MSG);
                     return false;
                 }
@@ -214,5 +258,26 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
             logger.error("", e);
         }
 
+    }
+
+    private static boolean versionChanged(String version, String minVersion) {
+        String[] versionArr = version.split("\\.");
+        String[] minVersionArr = minVersion.split("\\.");
+        for (int i = 0; i < versionArr.length; i++) {
+            if (Integer.parseInt(getNumberArray(minVersionArr[i])) > Integer.parseInt(getNumberArray(versionArr[i]))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String getNumberArray(String minVersionArr) {
+        String returnNumber = "";
+        for (int i = 0; i < minVersionArr.length(); i++) {
+            if (minVersionArr.charAt(i) >= '0' && minVersionArr.charAt(i) <= '9') {
+                returnNumber = returnNumber + minVersionArr.charAt(i);
+            }
+        }
+        return returnNumber;
     }
 }
