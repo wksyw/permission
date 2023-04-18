@@ -228,8 +228,8 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
             // TODO Auto-generated catch block
             e.printStackTrace();
             logger.error("requestUri="+requestUrl, e);
-            needAuthAccess(response, -1, "exception error");
-            return false;
+            //needAuthAccess(response, -1, "exception error");
+            return true;
         }
         return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
     }
