@@ -1,6 +1,7 @@
 package com.oumeng.auth.config;
 
 import com.oumeng.auth.entity.AuthConst;
+import com.oumeng.auth.entity.LicenseData;
 import com.oumeng.auth.entity.User;
 import com.oumeng.auth.utils.JsonUtil;
 import com.oumeng.auth.utils.ProcessResult;
@@ -40,6 +41,10 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     public static final int ERROR_USER_STATUS_LOCK = 20002;
     public static final String ERROR_USER_STATUS_LOCK_MSG = "用户已被停用";
 
+    @Autowired
+    private LicenseCheckService licenseCheckService;
+
+
     /*@Value("${not.interceptor.url:}")
     private String notInterceptorUrl;*/
 
@@ -60,6 +65,9 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
 
     @Autowired
     private Request request;
+
+    @Value("${initLicense:0}")
+    private String initLicense;
 
     @Override
     public void afterPropertiesSet() throws Exception {
@@ -91,20 +99,20 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
     public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse response, Object handler)
             throws Exception {
         // TODO Auto-generated method stub
-        String requestUrl ="";
+        String requestUrl = "";
         try {
             String version = httpServletRequest.getHeader("version");
             Map<String, Object> data = JsonUtil.fromJson(stringRedisTemplate.opsForValue().get("versionData"), Map.class);
-            if(version!=null){
-                if(data!=null){
+            if (version != null) {
+                if (data != null) {
                     String configVersion = (String) data.get("version");
-                    if(configVersion!=null && !configVersion.equals("")){
+                    if (configVersion != null && !configVersion.equals("")) {
                         Object versionCheckObject = data.get("versionCheck");
-                        if(versionCheckObject!=null){
+                        if (versionCheckObject != null) {
                             String versionCheckStr = versionCheckObject.toString();
-                            if(versionCheckStr.equals("1")){
-                                if(versionChanged(version,configVersion)){
-                                    logger.info("AuthTokenInterceptor version: "+version+" configVersion:"+configVersion);
+                            if (versionCheckStr.equals("1")) {
+                                if (versionChanged(version, configVersion)) {
+                                    logger.info("AuthTokenInterceptor version: " + version + " configVersion:" + configVersion);
                                     needAuthAccess(response, ErrorVersionCheck, ErrorMsgVersionCheck);
                                     return false;
                                 }
@@ -115,20 +123,21 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
             }
             boolean notInterceptor = false;
             requestUrl = httpServletRequest.getRequestURI();
-            logger.info("AuthTokenInterceptor: "+requestUrl+" applicationName: "+applicationName);
+            logger.info("AuthTokenInterceptor: " + requestUrl + " applicationName: " + applicationName);
             requestUrl = requestUrl.replace(httpServletRequest.getContextPath(), "");
             int urlIndex = requestUrl.indexOf("/", 1);
             String requestToken = httpServletRequest.getHeader("token");
-            if(!notInterceptorToken.equals("") && notInterceptorToken.equals(requestToken)){
+            logger.info("AuthTokenInterceptor token: " + requestToken);
+            if (!notInterceptorToken.equals("") && notInterceptorToken.equals(requestToken)) {
                 return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
             }
-            if(urlIndex==-1){
+            if (urlIndex == -1) {
                 return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
             }
             /*String leftUrl = requestUrl.substring(0, urlIndex);
             String rightUrl = requestUrl.substring(urlIndex);*/
             String notInterceptorUrl = stringRedisTemplate.opsForValue().get("notInterceptorUrl:" + applicationName);
-            if(notInterceptorUrl==null || notInterceptorUrl.equals("")){
+            if (notInterceptorUrl == null || notInterceptorUrl.equals("")) {
                 notInterceptorUrl = "/*";
             }
             String[] notInterceptorUrlArr = notInterceptorUrl.split(",");
@@ -137,7 +146,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                     notInterceptor = true;
                     break;
                 }
-                String notInterceptorLeftUrl = url.replace("*","");
+                String notInterceptorLeftUrl = url.replace("*", "");
                 /*String notInterceptorLeftUrl = url.substring(0, url.indexOf("/", 1));
                 String notInterceptorRightUrl = url.substring(url.indexOf("/", 1));
                 if (leftUrl.equals(notInterceptorLeftUrl)) {
@@ -150,7 +159,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                         break;
                     }
                 }*/
-                if(requestUrl.startsWith(notInterceptorLeftUrl)){
+                if (requestUrl.startsWith(notInterceptorLeftUrl)) {
                     notInterceptor = true;
                     break;
                 }
@@ -158,22 +167,22 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
             User user = request.getLoginUser();
             if (!notInterceptor) {
                 if (requestToken == null) {
-                    logger.info("AuthTokenInterceptor token: "+requestToken);
+                    logger.info("AuthTokenInterceptor token: " + requestToken);
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
                 }
                 if (user == null) {
-                    logger.info("AuthTokenInterceptor token: "+requestToken);
+                    logger.info("AuthTokenInterceptor token: " + requestToken);
                     needAuthAccess(response, ErrorNeedToken, ErrorMsgNeedToken);
                     return false;
                 }
-                if (user.getStatus()==1) {
-                    logger.info("AuthTokenInterceptor token: "+requestToken);
+                if (user.getStatus() == 1) {
+                    logger.info("AuthTokenInterceptor token: " + requestToken);
                     needAuthAccess(response, ERROR_USER_STATUS_LOCK, ERROR_USER_STATUS_LOCK_MSG);
                     return false;
                 }
                 boolean notPermission = false;
-                if(notPermissionUrl!=null && !notPermissionUrl.equals("")){
+                if (notPermissionUrl != null && !notPermissionUrl.equals("")) {
                     String[] notPermissionUrlArr = notPermissionUrl.split(",");
                     for (String url : notPermissionUrlArr) {
                         if ("/*".equals(url)) {
@@ -192,34 +201,43 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                                 break;
                             }
                         }*/
-                        String notInterceptorLeftUrl = url.replace("*","");
-                        if(requestUrl.startsWith(notInterceptorLeftUrl)){
+                        String notInterceptorLeftUrl = url.replace("*", "");
+                        if (requestUrl.startsWith(notInterceptorLeftUrl)) {
                             notPermission = true;
                             break;
                         }
                     }
                 }
+                //验证license
+                LicenseData licenseData = licenseCheckService.getLicenseData();
+                if(licenseData!=null){
+                    int licenseStatus = licenseData.getLicenseStatus();
+                    if (licenseStatus != 0 && licenseStatus!=-2014) {
+                        needAuthAccess(response, licenseData.getLicenseStatus(), "license信息错误");
+                        return false;
+                    }
+                }
                 //如果角色是admin
                 if (user.getIsAdmin() == 1) {
-                    if(!notPermission){
-                        dataLogUtil.insertLog(httpServletRequest,requestUrl,user,1);
+                    if (!notPermission) {
+                        dataLogUtil.insertLog(httpServletRequest, requestUrl, user, 1);
                     }
                     return HandlerInterceptor.super.preHandle(httpServletRequest, response, handler);
                 }
-                if(!notPermission){
-                    String permission = stringRedisTemplate.opsForValue().get((AuthConst.getUrlKey(user.getUserId()+"", requestUrl)));
+                if (!notPermission) {
+                    String permission = stringRedisTemplate.opsForValue().get((AuthConst.getUrlKey(user.getUserId() + "", requestUrl)));
                     if ("255".equals(permission)) {
-                        logger.info("AuthTokenInterceptor token: "+requestToken);
-                        dataLogUtil.insertLog(httpServletRequest,requestUrl,user,2);
+                        logger.info("AuthTokenInterceptor token: " + requestToken);
+                        dataLogUtil.insertLog(httpServletRequest, requestUrl, user, 2);
                         needAuthAccess(response, ErrorNoPermission, ErrorMsgNoPermission);
                         return false;
-                    }else{
-                        dataLogUtil.insertLog(httpServletRequest,requestUrl,user,1);
+                    } else {
+                        dataLogUtil.insertLog(httpServletRequest, requestUrl, user, 1);
                     }
                 }
-            }else {
-                if(user!=null && user.getStatus()==1){
-                    logger.info("AuthTokenInterceptor token: "+requestToken);
+            } else {
+                if (user != null && user.getStatus() == 1) {
+                    logger.info("AuthTokenInterceptor token: " + requestToken);
                     needAuthAccess(response, ERROR_USER_STATUS_LOCK, ERROR_USER_STATUS_LOCK_MSG);
                     return false;
                 }
@@ -227,7 +245,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
         } catch (Throwable e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-            logger.error("requestUri="+requestUrl, e);
+            logger.error("requestUri=" + requestUrl, e);
             //needAuthAccess(response, -1, "exception error");
             return true;
         }
