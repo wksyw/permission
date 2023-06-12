@@ -26,15 +26,16 @@ public class LicenseCheckService {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
-    public static LicenseData licenseData;
+    //public static LicenseData licenseData;
 
     public LicenseData getLicenseData() {
-        String licenseCheckTimeOut = redisTemplate.opsForValue().get("licenseCheckTimeOut");
+        /*String licenseCheckTimeOut = redisTemplate.opsForValue().get("licenseCheckTimeOut");
         if(licenseCheckTimeOut==null || readLicenseErrorTime!=null){
             licenseData = licenseStatusCheck();
             redisTemplate.opsForValue().set("licenseCheckTimeOut","1",1, TimeUnit.DAYS);
         }
-        return licenseData;
+        return licenseData;*/
+        return licenseStatusCheck();
     }
 
     @Value("${licenseFileName:/usr/oss/file/license/license.bin}")
@@ -95,8 +96,6 @@ public class LicenseCheckService {
         return jsonData;*/
     }
 
-    private String readLicenseErrorTime;
-
     public static void main(String[] args) {
         System.out.println(DigestUtils.md5Hex("2023-06-05 00:00:01" + "_" + "2023-06-16 23:59:59" + "_" + "1" + "_oumeng!@#$"));
     }
@@ -126,6 +125,7 @@ public class LicenseCheckService {
                     if (expireTimeDb.compareTo(currentTime) < 0 || TimeUtil.getTimeDay(createTimeDb, expireTimeDb) + 30 < runDay) {
                         licenseStatus = -2013;
                     }else {
+                        String readLicenseErrorTime = redisTemplate.opsForValue().get("readLicenseErrorTime");
                         if(readLicenseErrorTime==null){
                             licenseStatus = -2014;
                             int licenseRunErrorMinute = 4320;
@@ -134,6 +134,7 @@ public class LicenseCheckService {
                                 licenseRunErrorMinute = Integer.parseInt(licenseRunErrorMinuteStr);
                             }
                             readLicenseErrorTime = TimeUtil.getFormatTime(TimeUtil.DATE_FORMAT_STR_ALL,TimeUtil.timePastTenSecond(licenseRunErrorMinute,new Date(),Calendar.MINUTE));
+                            redisTemplate.opsForValue().set("readLicenseErrorTime",readLicenseErrorTime);
                         }else{
                             if (readLicenseErrorTime.compareTo(currentTime) < 0) {
                                 licenseStatus = -2015;
@@ -142,7 +143,7 @@ public class LicenseCheckService {
                         licenseDataResult.setExpireTime(readLicenseErrorTime);
                     }
                 }else {
-                    readLicenseErrorTime = null;
+                    redisTemplate.delete("readLicenseErrorTime");
                     Map<String, Object> licenseAllData = (Map<String, Object>) JsonUtil.fromJson(jsonData);
                     String contentJsonStr = (String) licenseAllData.get("content");
                     Map<String, Object> licenseData = (Map<String, Object>) JsonUtil.fromJson(contentJsonStr);
