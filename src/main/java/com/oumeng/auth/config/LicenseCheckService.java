@@ -1,6 +1,7 @@
 package com.oumeng.auth.config;
 
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.oumeng.auth.entity.LicenseData;
 import com.oumeng.auth.utils.JsonUtil;
@@ -97,7 +98,10 @@ public class LicenseCheckService {
     }
 
     public static void main(String[] args) {
-        System.out.println(DigestUtils.md5Hex("2023-06-05 00:00:01" + "_" + "2023-06-16 23:59:59" + "_" + "1" + "_oumeng!@#$"));
+        String json = "{\"system\":\"425\",\"type\":1,\"dataVersion\":\"V1.0\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"childModule\":[{\"permissionType\":\"1\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001\",\"code\":\"workplate\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.001\",\"code\":\"sampletracking\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.002\",\"code\":\"sampleCenter\"},{\"permissionType\":\"1\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.003\",\"code\":\"expCenter\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.003.001\",\"code\":\"ymn\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.003.002\",\"code\":\"mgi\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.003.003\",\"code\":\"mgiq\"},{\"permissionType\":\"1\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.004\",\"code\":\"Analysis\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.004.001\",\"code\":\"Analysis-YMN\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.004.002\",\"code\":\"Analysis-MGI\"},{\"permissionType\":\"1\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.005\",\"code\":\"Report\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.005.001\",\"code\":\"Report-YMN\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.005.002\",\"code\":\"Report-MGI\"},{\"permissionType\":\"1\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.006\",\"code\":\"Transform\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.006.001\",\"code\":\"Transform-mNGS\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.006.002\",\"code\":\"Transform-tNGS\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.007\",\"code\":\"checkedCenter\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.008\",\"code\":\"anomalousSample\"},{\"permissionType\":\"2\",\"enableTime\":\"2023-08-14 00:00:01\",\"expiredTime\":\"2099-12-31 23:59:59\",\"type\":1.0,\"id\":\"001.009\",\"code\":\"hisDataManager\"}]}";
+        String data = JsonUtil.toJson(JSON.parse(json));
+        System.out.println("data = "+data);
+        System.out.println(DigestUtils.md5Hex(data+" oumeng!@#$601Module"));
     }
 
     public LicenseData licenseStatusCheck() {
@@ -117,7 +121,13 @@ public class LicenseCheckService {
                 if (!sign.equals(DigestUtils.md5Hex(createTimeDb + "_" + expireTimeDb + "_" + runDay + "_oumeng!@#$"))) {
                     licenseStatus = -2012;
                 }
-                String jsonData = readLicense();
+                String jsonData = redisTemplate.opsForValue().get("licenseJsonData");
+                if(jsonData==null){
+                    jsonData = readLicense();
+                    if(jsonData!=null){
+                        redisTemplate.opsForValue().set("licenseJsonData",jsonData,1,TimeUnit.HOURS);
+                    }
+                }
                 if(StringUtils.isEmpty(jsonData)){
                     //再次读取失败 延期三天过期
                     licenseDataResult.setWarnStatus(1);

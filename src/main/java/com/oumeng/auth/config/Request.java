@@ -74,7 +74,7 @@ public class Request {
         HttpEntity<User> formEntity = new HttpEntity<>(user, headers);
         ProcessResult getUserResult = restTemplate.postForObject(authUrl+"/userInfo/getUserByUserId", formEntity, ProcessResult.class);
         String userStrDb = JsonUtil.toJson(getUserResult.getResponseInfo());
-        if(userStrDb!=null){
+        if(userStrDb!=null && !userStrDb.equals("null")){
             stringRedisTemplate.opsForValue().set(AuthConst.getUserInfoKey(userInfoKey),userStrDb);
         }
         return JsonUtil.fromJson(userStrDb, User.class);

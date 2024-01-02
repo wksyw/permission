@@ -146,7 +146,18 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                     notInterceptor = true;
                     break;
                 }
-                String notInterceptorLeftUrl = url.replace("*", "");
+                /*if(url.contains("*")){
+                    String notInterceptorLeftUrl = url.replace("*", "");
+                    if (requestUrl.startsWith(notInterceptorLeftUrl)) {
+                        notInterceptor = true;
+                        break;
+                    }
+                }else {
+                    if (requestUrl.equals(url)) {
+                        notInterceptor = true;
+                        break;
+                    }
+                }*/
                 /*String notInterceptorLeftUrl = url.substring(0, url.indexOf("/", 1));
                 String notInterceptorRightUrl = url.substring(url.indexOf("/", 1));
                 if (leftUrl.equals(notInterceptorLeftUrl)) {
@@ -159,6 +170,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
                         break;
                     }
                 }*/
+                String notInterceptorLeftUrl = url.replace("*", "");
                 if (requestUrl.startsWith(notInterceptorLeftUrl)) {
                     notInterceptor = true;
                     break;
@@ -284,6 +296,8 @@ public class AuthTokenInterceptor implements HandlerInterceptor, InitializingBea
         for (int i = 0; i < versionArr.length; i++) {
             if (Integer.parseInt(getNumberArray(minVersionArr[i])) > Integer.parseInt(getNumberArray(versionArr[i]))) {
                 return true;
+            }else if(Integer.parseInt(getNumberArray(minVersionArr[i])) < Integer.parseInt(getNumberArray(versionArr[i]))){
+                return false;
             }
         }
         return false;
